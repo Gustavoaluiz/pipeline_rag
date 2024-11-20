@@ -1,5 +1,5 @@
 from enum import Enum
 
-class LoadDataType(Enum):
-    LOCAL = "local"
+class EmbeddingType(Enum):
+    VERTEX_AI = "vertex_ai"
     HUGGING_FACE = "hugging_face"
