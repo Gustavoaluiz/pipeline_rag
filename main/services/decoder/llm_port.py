@@ -12,6 +12,7 @@ class LLMPort(ABC):
             generation_config: dict = None, 
             safety_settings: list = None
     ):
+        self.tokenizer = None   
         self.model_name = model_name
         self.generation_config = generation_config if generation_config else {}
         self.safety_settings = safety_settings if safety_settings else []
@@ -50,6 +51,9 @@ class LLMPort(ABC):
         Returns:
             str: Resposta gerada pelo modelo.
         """
+        
+
+
         context = "\n".join(chunks['content'].tolist())
         combined_prompt = f"Contexto:\n{context}\n\nPergunta do usuário:\n{user_prompt}"
         return self.generate_response(combined_prompt)
