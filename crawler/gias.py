@@ -35,6 +35,7 @@ class GisCrawler:
         self.nivel_4 = ''
         self.nivel_5 = ''
         self.text = ''
+        self.pages_text = ''
 
         # [nivel_3, nivel_4, nivel_5]
         self.nivel_count = [0, 0, 0]
@@ -100,10 +101,32 @@ class GisCrawler:
                 self.nivel_3 = text
 
             self.nivel_count[2] = self.count
+        
+        elif re.match(r'ORLZQA\+BasicSans-Bold', font) and size == 8:
+            self.text = ''
+        elif re.match(r'RPPRGU\+BasicSans-Light', font) and size == 6:
+            self.text = ''
+
         else:
             self.text = text + ' '
 
-            
+    def _extract_with_paragraph(self, page_text):    
+        # Retirar as quebras de linhas dos meios dos parágrafos
+        page_text = re.split(r'\.\n\s*(?=[A-Z])', page_text)
+        # print(page_text)
+        result =  ''
+        for t in page_text:
+            result += t + '.' + '\n\n'
+
+        # CONSERTAR HIFENS
+        result = re.sub(r'-\n\s*', '', result)
+        # RETIRAR \N, mantendo somente os paragrafos
+        result = re.sub(r'(?<!\n)\n(?!\n)', ' ', result)
+        result =  re.sub(r'\d*\s*©\d{4}, The Institute of Internal Auditors\. All Rights Reserved\.', '', result)
+        result =  re.sub(r' \n\nFor individual personal use only\.', '', result)
+
+        return result
+
     def _extract_pdf(self, pdf):
         for page in pdf.pages:
             # Ignora páginas anotadas para serem ignoradas
@@ -111,10 +134,12 @@ class GisCrawler:
                 continue
             
             page_lines = page.extract_text_lines(strip=True, return_chars=True)
+            page_text = page.extract_text()
+            self.pages_text += self._extract_with_paragraph(page_text)
 
             # Itera o pdf linha por linha
             for line in page_lines:
-                # print(line['chars'][0]['fontname'] + '\t' + str(int(line['chars'][0]['size'])) + '\t' + line['text'])
+                # print([line['chars'][0]['fontname'] + '\t' + str(int(line['chars'][0]['size'])) + '\t' + line['text']])
 
                 self.count += 1
                 self.text = ''
@@ -142,10 +167,36 @@ class GisCrawler:
                     register = self._create_register()
                     self.results.append(register)
 
+    def _add_paragraphs(self, row):
+        # Conserta as separações por hífens nas quebras de linhas do pdf
+        row['conteudo'] = re.sub(r'-\s*', '', row['conteudo'])
+
+        # Dividindo o texto com parágrafos, utilizando as quebras duplas como delimitador
+        paragraphs = self.pages_text.split('.\n\n')
+
+        # Removendo espaços desnecessários dos parágrafos divididos
+        paragraphs = [par.strip() for par in paragraphs if par.strip()]
+
+        # Iterando sobre cada parágrafo encontrado
+        for par in paragraphs:
+            # Procurando onde a parte final parágrafo ocorre no texto
+            index = row['conteudo'].find(par)
+            
+            if index != -1:
+                # Calculando a posição de inserção da quebra dupla (logo após o parágrafo)
+                insert_position = index + len(par) + 1
+                # Inserindo a quebra dupla na posição correta
+                row['conteudo'] = (
+                    row['conteudo'][:insert_position] + "\n\n" + row['conteudo'][insert_position:]
+                )
+
+        return row
+
     def _clean_df(self, df):
         # Dropa linhas sem texto
         df.drop(df[df['conteudo'] == ''].index, inplace=True)
-        # df.drop(df[df['nivel_1'] == ''].index, inplace=True)
+        df.drop(df[df['nivel_1'] == ''].index, inplace=True)
+        df.apply(self._add_paragraphs, axis=1)  
         # df.drop(df[df['nivel_2'] == ''].index, inplace=True)
         
 
@@ -178,10 +229,10 @@ if __name__ == '__main__':
         ren = GisCrawler(
             path=path, 
             name=name, 
-            ignore_pages=[1,2,3]
+            ignore_pages=[1,2,3,4, 122]
         )
-
         ren.read_pdf()
+        # print(ren.pages_text)
 
     # data_concat('proced_regula_tarifaria')
         
